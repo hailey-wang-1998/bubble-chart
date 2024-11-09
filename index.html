@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<meta charset="utf-8">
+<style type="text/css">
+    body {
+        text-align: center;
+    }
+    text {
+        font-family: sans-serif;
+        pointer-events: none;
+    }
+    circle {
+        stroke: #565352;
+        stroke-width: 0.5px;
+    }
+    svg {
+        display: block;
+        margin: 0 auto;
+    }
+</style>
+<body>
+
+<h1>2019 U.S. Electric Vehicle Counts</h1>  <!-- Title added here -->
+
+<script src="js/d3.v5.min.js"></script>
+<script>
+d3.csv("ev cars count.csv").then(function(data) {
+
+    // Set column names based on your CSV
+    var values = "count in 2019",
+        names = "Vehicle";
+
+    // Convert numerical data from strings to numbers
+    data.forEach(function(d) {
+        d[values] = +d[values];
+    });
+
+    // Set margins and size of your SVG
+    var margin = {top: 5, right: 5, bottom: 5, left: 5},
+        width  = 1400 - margin.left - margin.right, 
+        height = 680 - margin.top - margin.bottom;
+
+    // Set up main SVG container
+    var svg = d3.select("body")
+        .append("svg")
+        .attr("width", width + margin.left + margin.right)
+        .attr("height", height + margin.top + margin.bottom);
+
+    // Chart grouping that will house the actual chart
+    var chart = svg.append("g")
+        .attr("transform", "translate(" + margin.left + "," + margin.top + ")");
+
+    // Color scale based on value size
+    var color = d3.scaleSequential(d3.interpolateOranges)
+        .domain([0, d3.max(data, function(d) { return d[values]; })]);
+
+    // Pack layout for bubbles
+    var packLayout = d3.pack()
+        .size([width, height])
+        .padding(2.5);
+
+    // Hierarchical data structure
+    var rootNode = d3.hierarchy({children: data})
+        .sum(function(d) { return Math.sqrt(d[values]); });
+
+    // Apply pack layout
+    packLayout(rootNode);
+
+    // Create bubbles
+    var bubbles = chart.selectAll("circle")
+        .data(rootNode.leaves());
+
+    var bubblesE = bubbles.enter().append("circle")
+        .classed("bubble", true)
+        .attr("cx", function(d) { return d.x; })
+        .attr("cy", function(d) { return d.y; })
+        .attr("r", function(d) { return d.r; })
+        .attr("fill", function(d) { return color(d.data[values]); })
+        .attr("stroke", function(d) { return d3.rgb(color(d.data[values])).darker(); })
+        .attr("stroke-width", 1)
+        .append("title")  // Tooltip with vehicle name
+        .text(function(d) { return d.data[names]; });
+
+    bubbles = bubbles.merge(bubblesE);
+
+    // Text labels over bubbles
+    var text = chart.selectAll("text")
+        .data(rootNode.leaves());
+
+    var textE = text.enter()
+        .append("text")
+        .text(function(d) { return d.data[names].trim(); })
+        .attr("text-anchor", "middle")
+        .attr("x", function(d) { return d.x; })
+        .attr("y", function(d) { return d.y; })
+        .style("font-size", function(d) {
+            return Math.min(d.r / 3, 10) + "px";  // Adjust font size based on circle radius
+        })
+        .each(wrapText);
+
+    text = text.merge(textE);
+
+});
+
+// Text wrapping function for labels
+function wrapText(d) {
+    var t = d3.select(this),
+        twidth = d.r * 2,
+        x = d.x,
+        y = d.y,
+        words = t.text().split(/\s+/).reverse(),
+        word,
+        line = [],
+        lineNumber = 0,
+        lineHeight = 1.2,
+        tspan = t.text(null).append("tspan").attr("x", x).attr("y", y).attr("alignment-baseline", "middle");
+
+    while (word = words.pop()) {
+        line.push(word);
+        tspan.text(line.join(" "));
+        if (tspan.node().getComputedTextLength() > twidth) {
+            line.pop();
+            tspan.text(line.join(" "));
+            line = [word];
+            tspan = t.append("tspan").attr("x", x).attr("y", y).attr("dy", ++lineNumber * lineHeight + "em").text(word);
+        }
+    }
+}
+</script>
+</body>
